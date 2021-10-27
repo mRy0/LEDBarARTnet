@@ -5,12 +5,20 @@
 */
 
 // the setup function runs once when you press reset or power the board
+
+#include "OTAUpdateServer.h"
 #include <FastLED.h>
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <ESPmDNS.h>
+#include "AsyncUDP.h"
+
 
 #define LED_PIN_1 25
 #define LED_PIN_2 26
 
 #define LED_PER_STRAND 300
+#define LED_TOTAL (LED_PER_STRAND + LED_PER_STRAND)
 
 #define PIXEL_PER_BAR 60
 #define BARS 10
@@ -27,7 +35,19 @@
 #define ANIMATION_STOBO 9
 #define ANIMATION_RAINBOW 10
 
+
 #define SLOW_SPEED 255
+
+#define ARTNET_PORT 6454
+#define ARTNET_UNIVERSE 1
+
+AsyncUDP udpServer;
+
+
+const char* host = "esp_led_bar_1";
+const char* ssid = "RAVENET";
+const char* password = "FickDichMitPasswort!";
+const char* ota_password = "revoltec";
 
 
 
@@ -75,22 +95,127 @@ uint animation_cycle = 0;
 
 
 void setup() {
+	//waaaait for power ??
+	delay(5000);
 	Serial.begin(115200);
 	delay(1000);
-
 	Serial.println("system is starting...");
+
+
+	SetupWifi();
+	SetupOTAServer(host, ota_password);
+
+	if (!SetupARTnet())
+		ESP.restart();
+
 	FastLED.addLeds<NEOPIXEL, LED_PIN_1>(leds_1, LED_PER_STRAND);
 	FastLED.addLeds<NEOPIXEL, LED_PIN_2>(leds_2, LED_PER_STRAND);
 
 	SetupBars();
-	Demo();
+
+	//say hello
+	SetupFinished();
+
 }
+
+
+void SetupWifi() {
+	WiFi.begin(ssid, password);
+	Serial.println("");
+	// Wait for connection
+	while (WiFi.status() != WL_CONNECTED) {
+		delay(500);
+		Serial.print(".");
+	}
+	Serial.println("");
+	Serial.print("Connected to ");
+	Serial.println(ssid);
+	Serial.print("IP address: ");
+	Serial.println(WiFi.localIP());
+
+	/*use mdns for host name resolution*/
+	if (!MDNS.begin(host)) { //http://esp32.local
+		Serial.println("Error setting up MDNS responder!");
+		while (1) {
+			delay(1000);
+		}
+	}
+	Serial.println("mDNS responder started");
+
+	Serial.println("WiFi Ready");
+	Serial.print("IP address: ");
+	Serial.println(WiFi.localIP());
+	
+}
+
+
+
+bool SetupARTnet() {
+	if (udpServer.listen(ARTNET_PORT)) {
+
+		udpServer.onPacket([](AsyncUDPPacket packet) {
+			
+		});
+		return true;
+	}	
+	return false;
+}
+void SetupFinished() {
+	Serial.println("ready to rumble...");
+	for (size_t i = 0; i < 4; i++)
+	{
+		delay(50);
+		for (size_t px = 0; px < LED_TOTAL; px++)
+		{
+			SetPixel(px, 255, 0, 255);
+		}
+		ShowPixel();
+		delay(25);
+		for (size_t px = 0; px < LED_TOTAL; px++)
+		{
+			SetPixel(px, 0, 0, 0);
+		}
+		ShowPixel();
+	}
+	for (size_t hue = 0; hue < 255; hue++)
+	{
+		for (size_t px = 0; px < LED_TOTAL; px++)
+		{
+			SetPixel(px, hue, 255, 255);
+		}
+		ShowPixel();
+	}
+	for (size_t px = 0; px < LED_TOTAL; px++)
+	{
+		SetPixel(px, 0, 0, 0);
+	}
+	ShowPixel();
+
+	for (size_t i = 0; i < 4; i++)
+	{
+		delay(50);
+		for (size_t px = 0; px < LED_TOTAL; px++)
+		{
+			SetPixel(px, 255, 0, 255);
+		}
+		ShowPixel();
+		delay(25);
+		for (size_t px = 0; px < LED_TOTAL; px++)
+		{
+			SetPixel(px, 0, 0, 0);
+		}
+		ShowPixel();
+	}
+	Serial.println("!!!!!");
+}
+
 
 // the loop function runs over and over again until power down or reset
 void loop() {
 
+	HandleUpdateServer();
 	for (size_t i = 0; i < BARS; i++)
-	{		
+	{
 		HandleBar(&bars[i]);
 	}
 
@@ -98,10 +223,8 @@ void loop() {
 
 	animation_cycle++;
 	delay(1);
-	
+
 }
-
-
 
 void HandleBar(Bar* bar) {
 
@@ -356,10 +479,16 @@ void SetPixel(uint px, byte h, byte s, byte v) {
 		return;
 	else if (px < LED_PER_STRAND)
 		leds_1[px] = CHSV(h, s, v);
-	else if(px <= (LED_PER_STRAND + LED_PER_STRAND))
+	else if(px <= LED_TOTAL)
 		leds_2[px - LED_PER_STRAND] = CHSV(h, s, v);	
 }
 
 void ShowPixel() {
 	FastLED.show();
+}
+
+
+void HandleARTnetMessage(uint8_t* data, int len) {
+	
+
 }
