@@ -7,11 +7,11 @@
 // the setup function runs once when you press reset or power the board
 
 #include "OTAUpdateServer.h"
+#include "ARTnet.h"
 #include <FastLED.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <ESPmDNS.h>
-#include "AsyncUDP.h"
 
 
 #define LED_PIN_1 25
@@ -38,10 +38,8 @@
 
 #define SLOW_SPEED 255
 
-#define ARTNET_PORT 6454
 #define ARTNET_UNIVERSE 1
 
-AsyncUDP udpServer;
 
 
 const char* host = "esp_led_bar_1";
@@ -49,7 +47,7 @@ const char* ssid = "RAVENET";
 const char* password = "FickDichMitPasswort!";
 const char* ota_password = "revoltec";
 
-
+ARTnet artnet;
 
 CRGB leds_1[LED_PER_STRAND];
 CRGB leds_2[LED_PER_STRAND];
@@ -103,9 +101,10 @@ void setup() {
 
 
 	SetupWifi();
-	SetupOTAServer(host, ota_password);
+	
+	OTAUpdateServer::Setup(host, ota_password);
 
-	if (!SetupARTnet())
+	if (! artnet.Setup())
 		ESP.restart();
 
 	FastLED.addLeds<NEOPIXEL, LED_PIN_1>(leds_1, LED_PER_STRAND);
@@ -150,16 +149,6 @@ void SetupWifi() {
 
 
 
-bool SetupARTnet() {
-	if (udpServer.listen(ARTNET_PORT)) {
-
-		udpServer.onPacket([](AsyncUDPPacket packet) {
-			HandleARTnetMessage(packet.data(), packet.length());
-		});
-		return true;
-	}	
-	return false;
-}
 void SetupFinished() {
 	Serial.println("ready to rumble...");
 	for (size_t i = 0; i < 4; i++)
@@ -213,7 +202,7 @@ void SetupFinished() {
 // the loop function runs over and over again until power down or reset
 void loop() {
 
-	HandleUpdateServer();
+	OTAUpdateServer::Handle();
 	for (size_t i = 0; i < BARS; i++)
 	{
 		HandleBar(&bars[i]);
@@ -502,41 +491,41 @@ void ShowPixel() {
 * 10 = Front Speed 
 * 11 = Front Direction  Bool>127
 */
-void HandleARTnetMessage(uint8_t* data, int len) {
-
-	//man pack len
-	if (len < 18)
-		return;
-	//atnetflag
-	if (data[9] != 0x50)
-		return;
-
-	uint16_t universe = (data[15] << 8) + data[14];
-
-	if (universe != ARTNET_UNIVERSE)
-		return;
-
-
-	uint16_t dataLen = (data[16] << 8) + (data[17]);
-
-	//min len expected
-	if (dataLen < (12 * BARS))
-		return;
-	//overflow check
-	if (dataLen > (len + 18))
-		return;
-
-
-	uint pos = 18;
-	for (size_t i = 0; i < BARS; i++)
-	{
-		bars[i].Animation = data[pos++];
-		bars[i].Hue = data[pos++];
-		bars[i].Saturation = data[pos++];
-		bars[i].Value = data[pos++];
-		bars[i].SetSpeed(data[pos++]);
-		bars[i].SetDirection(data[pos++]);
-
-		pos += 6;
-	}
-}
+//void HandleARTnetMessage(uint8_t* data, int len) {
+//
+//	//man pack len
+//	if (len < 18)
+//		return;
+//	//atnetflag
+//	if (data[9] != 0x50)
+//		return;
+//
+//	uint16_t universe = (data[15] << 8) + data[14];
+//
+//	if (universe != ARTNET_UNIVERSE)
+//		return;
+//
+//
+//	uint16_t dataLen = (data[16] << 8) + (data[17]);
+//
+//	//min len expected
+//	if (dataLen < (12 * BARS))
+//		return;
+//	//overflow check
+//	if (dataLen > (len + 18))
+//		return;
+//
+//
+//	uint pos = 18;
+//	for (size_t i = 0; i < BARS; i++)
+//	{
+//		bars[i].Animation = data[pos++];
+//		bars[i].Hue = data[pos++];
+//		bars[i].Saturation = data[pos++];
+//		bars[i].Value = data[pos++];
+//		bars[i].SetSpeed(data[pos++]);
+//		bars[i].SetDirection(data[pos++]);
+//
+//		pos += 6;
+//	}
+//}

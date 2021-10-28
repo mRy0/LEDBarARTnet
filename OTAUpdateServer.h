@@ -8,7 +8,12 @@
     #include <WiFiUdp.h>
     #include <ArduinoOTA.h>
 
-#endif
+class OTAUpdateServer
+{
+public:
+    static void Setup(const char* name, const char* pass);
+    static void Handle();
+};
 
-void SetupOTAServer(const char* name, const char* pass);
-void HandleUpdateServer();
+
+#endif

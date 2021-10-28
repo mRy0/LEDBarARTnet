@@ -3,12 +3,10 @@
 // 
 
 #include "OTAUpdateServer.h"
-
-
 /*
  * setup function
  */
-void SetupOTAServer(const char* name, const char* pass) {
+void OTAUpdateServer::Setup(const char* name, const char* pass) {
     
 
     // Port defaults to 3232
@@ -50,6 +48,6 @@ void SetupOTAServer(const char* name, const char* pass) {
 
 }
 
-void HandleUpdateServer() {
+void OTAUpdateServer::Handle() {
     ArduinoOTA.handle();
 }
