@@ -154,7 +154,7 @@ bool SetupARTnet() {
 	if (udpServer.listen(ARTNET_PORT)) {
 
 		udpServer.onPacket([](AsyncUDPPacket packet) {
-			
+			HandleARTnetMessage(packet.data(), packet.length());
 		});
 		return true;
 	}	
@@ -487,8 +487,52 @@ void ShowPixel() {
 	FastLED.show();
 }
 
-
+/*
+* Message Diagram:
+* 0 = Back Animation Id
+* 1 = Back Hue
+* 2 = Back Sat
+* 3 = Back Val
+* 4 = Back Speed 
+* 5 = Back Direction  Bool>127
+* 6 = Front Animation Id
+* 7 = Front Hue
+* 8 = Front Sat
+* 9 = Front Val
+* 10 = Front Speed 
+* 11 = Front Direction  Bool>127
+*/
 void HandleARTnetMessage(uint8_t* data, int len) {
-	
 
+	//man pack len
+	if (len < 18)
+		return;
+	//atnetflag
+	if (data[9] != 0x50)
+		return;
+
+	uint16_t universe = (data[15]) + (data[14]);
+	if (universe != ARTNET_UNIVERSE)
+		return;
+
+	uint16_t dataLen = (data[17] << 8) + (data[16]);
+	//min len expected
+	if (dataLen < (12 * BARS))
+		return;
+	//overflow check
+	if (dataLen < (len + 18))
+		return;
+
+	uint pos = 18;
+	for (size_t i = 0; i < BARS; i++)
+	{
+		bars[i].Animation = data[pos++];
+		bars[i].Hue = data[pos++];
+		bars[i].Saturation = data[pos++];
+		bars[i].Value = data[pos++];
+		bars[i].SetSpeed(data[pos++]);
+		bars[i].SetDirection(data[pos++]);
+
+		pos += 6;
+	}
 }
