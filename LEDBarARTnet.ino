@@ -511,17 +511,21 @@ void HandleARTnetMessage(uint8_t* data, int len) {
 	if (data[9] != 0x50)
 		return;
 
-	uint16_t universe = (data[15]) + (data[14]);
+	uint16_t universe = (data[15] << 8) + data[14];
+
 	if (universe != ARTNET_UNIVERSE)
 		return;
 
-	uint16_t dataLen = (data[17] << 8) + (data[16]);
+
+	uint16_t dataLen = (data[16] << 8) + (data[17]);
+
 	//min len expected
 	if (dataLen < (12 * BARS))
 		return;
 	//overflow check
-	if (dataLen < (len + 18))
+	if (dataLen > (len + 18))
 		return;
+
 
 	uint pos = 18;
 	for (size_t i = 0; i < BARS; i++)
