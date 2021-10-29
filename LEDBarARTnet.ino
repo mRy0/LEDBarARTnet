@@ -133,6 +133,9 @@ void SetupWifi() {
 
 	// Make sure you're in station mode    
 	WiFi.mode(WIFI_STA);
+	
+	//disable sleep
+        esp_wifi_set_ps (WIFI_PS_NONE);
 
 	WiFi.begin(ssid, password);
 	Serial.println("");
