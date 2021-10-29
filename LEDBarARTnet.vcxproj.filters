@@ -24,15 +24,9 @@
     <ClInclude Include="OTAUpdateServer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ARTnet.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="OTAUpdateServer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ARTnet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
