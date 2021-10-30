@@ -31,12 +31,13 @@
 #define ANIMATION_MODULO 5
 #define ANIMATION_STOBO 6
 #define ANIMATION_RAINBOW 7
-
+#define ANIMATION_RAINBOW_MANUAL 8
 
 #define SLOW_SPEED 255
 
 #define UNIVERSE 1
 #define UNIVERSE_COUNT 1
+#define DMX_START_ADDRESS 1
 
 // ESPAsyncE131 instance with UNIVERSE_COUNT buffer slots
 ESPAsyncE131 e131(UNIVERSE_COUNT);
@@ -133,9 +134,9 @@ void SetupWifi() {
 
 	// Make sure you're in station mode    
 	WiFi.mode(WIFI_STA);
-	
+	WiFi.setSleep(false);
+
 	//disable sleep
-        esp_wifi_set_ps (WIFI_PS_NONE);
 
 	WiFi.begin(ssid, password);
 	Serial.println("");
@@ -285,6 +286,9 @@ void HandleBar(Bar* bar) {
 		AnimateStrobo(bar);
 	else if (bar->Animation == ANIMATION_RAINBOW)
 		AnimateRainbow(bar);
+	else if (bar->Animation == ANIMATION_RAINBOW_MANUAL)
+		Rainbow(bar);
+    
 }
 
 
@@ -423,7 +427,7 @@ void AnimateStrobo(Bar* bar) {
 		}
 	}
 	else if(bar->Red > 0 && bar->Green > 0 && bar->Blue > 0) {
-		//all off
+		//all on
 		for (size_t px = 0; px < PIXEL_PER_BAR; px++) {
 			SetBarPixel(bar, px, bar->Red, bar->Green, bar->Blue);
 		}
@@ -436,13 +440,25 @@ void AnimateRainbow(Bar* bar) {
 		bar->AnimationStep = 0;
 
 	int hueStep = round(((float)255 / PIXEL_PER_BAR));
-
+  
 
 	for (size_t px = 0; px < PIXEL_PER_BAR; px++)
 	{
 		SetBarPixelHSV(bar, px, CHSV(bar->AnimationStep + (px * hueStep), 255,255));
 	}
+}
+void Rainbow(Bar* bar) {
+	if (bar->AnimationStep > 255)
+		bar->AnimationStep = 0;
 
+	int hueStep = round(((float)255 / PIXEL_PER_BAR));
+  
+  uint16_t brighteness= (bar->Red + bar->Green + bar->Blue) / 3;
+
+	for (size_t px = 0; px < PIXEL_PER_BAR; px++)
+	{
+		SetBarPixelHSV(bar, px, CHSV(brighteness + (px * hueStep), 255,255));
+	}
 }
 
 
@@ -565,12 +581,12 @@ void HandleE131() {
 		if (universe != UNIVERSE)
 			return;
 
-		if (dmxDataLen < (BARS * 6))
+		if (dmxDataLen < ((BARS * 6) + (DMX_START_ADDRESS - 1)))
 			return;
 
 		for (size_t i = 0; i < (BARS * 2); i++)
 		{
-			bars[i].ParseE131Packet(packet, (i * 6) + 1);
+			bars[i].ParseE131Packet(packet, (i * 6) + DMX_START_ADDRESS);
 		}
 	}
 }
