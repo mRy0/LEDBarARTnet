@@ -1,7 +1,0 @@
-// 
-// 
-// 
-
-#include "LEDBar.h"
-
-
