@@ -77,7 +77,7 @@ struct Bar {
 			CyclePerStep = 0;
 			return;
 		}
-		float fSpeed= speed;
+		float fSpeed = speed;
 		fSpeed = SLOW_SPEED / fSpeed;
 
 		CyclePerStep =  round(fSpeed);
@@ -259,6 +259,22 @@ void loop() {
 
 void HandleBar(Bar* bar) {
 
+  //ignore this mode
+	if (bar->Animation == ANIMATION_OFF)
+  {
+		AnimateOff(bar);
+    return;
+  }
+	else if (bar->Animation == ANIMATION_STATIC){
+		AnimateFullColor(bar);
+    return;
+  }
+	else if (bar->Animation == ANIMATION_RAINBOW_MANUAL){
+		Rainbow(bar);
+    return;
+  }
+  
+
 	//# calculate next animation step
 	//stop if speed is 0
 	if (bar->CyclePerStep == 0)
@@ -270,11 +286,7 @@ void HandleBar(Bar* bar) {
 		return;
 
 
-	if (bar->Animation == ANIMATION_OFF)
-		AnimateOff(bar);
-	else if (bar->Animation == ANIMATION_STATIC)
-		AnimateFullColor(bar);
-	else if (bar->Animation == ANIMATION_FADE)
+	if (bar->Animation == ANIMATION_FADE)
 		AnimateFade(bar);
 	else if (bar->Animation == ANIMATION_WARP)
 		AnimateWarp(bar);
@@ -286,8 +298,6 @@ void HandleBar(Bar* bar) {
 		AnimateStrobo(bar);
 	else if (bar->Animation == ANIMATION_RAINBOW)
 		AnimateRainbow(bar);
-	else if (bar->Animation == ANIMATION_RAINBOW_MANUAL)
-		Rainbow(bar);
     
 }
 
