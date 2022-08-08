@@ -247,18 +247,18 @@ void HandleE131() {
 		if (universe != UNIVERSE)
 			return;
 
-		if (dmxDataLen < MIN_DATA_LEN)
+		if (dmxDataLen < MIN_DATA_LEN +1)
 			return;
 
 		size_t currentPixel = 0;
 
-		for (size_t pxColor = 0; pxColor < MIN_DATA_LEN; pxColor += 3)
+		for (size_t dmxIndex = 1; dmxIndex < (MIN_DATA_LEN +1); dmxIndex += 3)
 		{
-			for (size_t px = 0; px < PX_PER_ADDR; px++) {
-				currentPixel++;
-				SetPixel(currentPixel, packet.property_values[pxColor],
-					packet.property_values[pxColor + 1], packet.property_values[pxColor + 2]);
-			}
+        for(size_t pxAddr = 0; pxAddr < PX_PER_ADDR; pxAddr++){
+          SetPixel(currentPixel, packet.property_values[dmxIndex],
+            packet.property_values[dmxIndex + 1], packet.property_values[dmxIndex + 2]);
+          currentPixel++;
+        }
 
 		}
 	}
