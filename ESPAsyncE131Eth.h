@@ -19,7 +19,7 @@
 
 #pragma once
 
-#define _ASYNC_UDP_WT32_ETH01_LOGLEVEL_       1
+#define _ASYNC_UDP_WT32_ETH01_LOGLEVEL_       0
 #include "AsyncUDP_WT32_ETH01.hpp"
 
 #include <lwip/ip_addr.h>

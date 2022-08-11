@@ -6,11 +6,22 @@
 
 
 
-#define LED_PIN_1 25
-#define LED_PIN_2 26
+#define LED_PIN_1 32
+#define LED_PIN_2 33
 
+// Ethernet port parameters
+// ETH_CLOCK_GPIO17_OUT - 50MHz clock from internal APLL inverted output on GPIO17 - tested with LAN8720.
 #define ETH_CLK_MODE ETH_CLOCK_GPIO17_OUT
+// Pin number of the enable signal for the external crystal oscillator (-1 to disable for internal APLL source).
 #define ETH_PHY_POWER 12
+// Type of the Ethernet PHY (LAN8720 or TLK110).
+#define ETH_PHY_TYPE ETH_PHY_LAN8720
+// I²C-address of Ethernet PHY (0 or 1 for LAN8720, 31 for TLK110).
+#define ETH_PHY_ADDR 0
+// Pin number of the I²C clock signal for the Ethernet PHY.
+#define ETH_PHY_MDC 23
+// Pin number of the I²C IO signal for the Ethernet PHY.
+#define ETH_PHY_MDIO 18
 
 #include <ETH.h>
 
@@ -46,7 +57,6 @@ const char* host = "esp_led_bar_1.local";
 //const char* password = "FickDichMitPasswort!";
 const char* ota_password = "revoltec";
 
-static bool eth_connected = false;
 
 CRGB leds_1[LED_PER_STRAND];
 CRGB leds_2[LED_PER_STRAND];
@@ -64,28 +74,13 @@ void setup() {
 
 
 
-	//FastLED.addLeds<NEOPIXEL, LED_PIN_1>(leds_1, LED_PER_STRAND);
-	//FastLED.addLeds<NEOPIXEL, LED_PIN_2>(leds_2, LED_PER_STRAND);
+	FastLED.addLeds<NEOPIXEL, LED_PIN_1>(leds_1, LED_PER_STRAND);
+	FastLED.addLeds<NEOPIXEL, LED_PIN_2>(leds_2, LED_PER_STRAND);
 
   
 	//say hello
 	SetupFinished();
 
-}
-
-
-
-void EthernetReady(){
-  
-  /*use mdns for host name resolution*/
-  if (!MDNS.begin(host)) { //http://esp32.local
-    Serial.println("Error setting up MDNS responder!");
-    ESP.restart();
-  }
-  
-  SetupE131();
-  ArduinoOTA.begin();
-  eth_connected = true;
 }
 
 
@@ -97,58 +92,38 @@ void BeginEthernet()
   // To be called before ETH.begin()
   WT32_ETH01_onEvent();
   
-  WiFi.onEvent(WiFiEvent);
+  //bool begin(uint8_t phy_addr=ETH_PHY_ADDR, int power=ETH_PHY_POWER, int mdc=ETH_PHY_MDC, int mdio=ETH_PHY_MDIO, 
+  //           eth_phy_type_t type=ETH_PHY_TYPE, eth_clock_mode_t clk_mode=ETH_CLK_MODE);
+  //ETH.begin(ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_TYPE, ETH_CLK_MODE);
   ETH.begin(ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_TYPE, ETH_CLK_MODE);
+
+  WT32_ETH01_waitForConnect();
+  
+  // Client address
+  Serial.print("AsyncUdpNTPClient started @ IP address: ");
+  Serial.println(ETH.localIP());
+
+  
+  /*use mdns for host name resolution*/
+  if (!MDNS.begin(host)) { //http://esp32.local
+    Serial.println("Error setting up MDNS responder!");
+    ESP.restart();
+  }
+  
   SetupUpdateServer();
+  
+  SetupE131();
+  ArduinoOTA.begin();
 }
 
 
 // the loop function runs over and over again until power down or reset
 void loop() {
-  delay(1);
-  if(!eth_connected)
-    return;
     
   ArduinoOTA.handle();
   HandleE131();
 	FastLED.show();
-}
-
-void WiFiEvent(WiFiEvent_t event)
-{
-  switch (event) {
-    case SYSTEM_EVENT_ETH_START:
-      Serial.println("ETH Started");
-      //set eth hostname here
-      ETH.setHostname(host);
-      break;
-    case SYSTEM_EVENT_ETH_CONNECTED:
-      Serial.println("ETH Connected");
-      break;
-    case SYSTEM_EVENT_ETH_GOT_IP:
-      Serial.print("ETH MAC: ");
-      Serial.print(ETH.macAddress());
-      Serial.print(", IPv4: ");
-      Serial.print(ETH.localIP());
-      if (ETH.fullDuplex()) {
-        Serial.print(", FULL_DUPLEX");
-      }
-      Serial.print(", ");
-      Serial.print(ETH.linkSpeed());
-      Serial.println("Mbps");
-      EthernetReady();
-      break;
-    case SYSTEM_EVENT_ETH_DISCONNECTED:
-      Serial.println("ETH Disconnected");
-      eth_connected = false;
-      break;
-    case SYSTEM_EVENT_ETH_STOP:
-      Serial.println("ETH Stopped");
-      eth_connected = false;
-      break;
-    default:
-      break;
-  }
+  delay(1);
 }
 
 
@@ -270,12 +245,7 @@ void HandleE131() {
 		uint16_t universe = htons(packet.universe);
 		uint16_t dmxDataLen = htons(packet.property_value_count) - 1;
 
-
-    
-    Serial.print("recieved E131 Universe");
-    Serial.println(universe);
-    
-  
+ 
 		if (universe != UNIVERSE)
 			return;
 
@@ -292,7 +262,7 @@ void HandleE131() {
           SetPixel(currentPixel, packet.property_values[dmxIndex],
             packet.property_values[dmxIndex + 1], packet.property_values[dmxIndex + 2]);
           currentPixel++;
-        }
+        }  
 
 		}
 	}
