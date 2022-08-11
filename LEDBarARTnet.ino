@@ -1,15 +1,20 @@
-#include <ESPAsyncE131.h>
+#include <AsyncUDP_WT32_ETH01.h>
+#include "ESPAsyncE131Eth.h"
 #include <FastLED.h>
-#include <esp_wifi.h>
-#include <WiFiClient.h>
 #include <ESPmDNS.h>
-#include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 
 
 
 #define LED_PIN_1 25
 #define LED_PIN_2 26
+
+#define ETH_CLK_MODE ETH_CLOCK_GPIO17_OUT
+#define ETH_PHY_POWER 12
+
+#include <ETH.h>
+
+
 
 #define LED_PER_STRAND 300
 #define LED_TOTAL (LED_PER_STRAND + LED_PER_STRAND)
@@ -36,11 +41,12 @@
 ESPAsyncE131 e131(UNIVERSE_COUNT);
 
 
-const char* host = "esp_led_bar_1";
-const char* ssid = "RAVENET";
-const char* password = "FickDichMitPasswort!";
+const char* host = "esp_led_bar_1.local";
+//const char* ssid = "RAVENET";
+//const char* password = "FickDichMitPasswort!";
 const char* ota_password = "revoltec";
 
+static bool eth_connected = false;
 
 CRGB leds_1[LED_PER_STRAND];
 CRGB leds_2[LED_PER_STRAND];
@@ -54,16 +60,14 @@ void setup() {
 	Serial.println("system is starting...");
 
 
-	SetupWifi();
-	SetupE131();
-
-	SetupUpdateServer();
+	BeginEthernet();
 
 
-	FastLED.addLeds<NEOPIXEL, LED_PIN_1>(leds_1, LED_PER_STRAND);
-	FastLED.addLeds<NEOPIXEL, LED_PIN_2>(leds_2, LED_PER_STRAND);
 
+	//FastLED.addLeds<NEOPIXEL, LED_PIN_1>(leds_1, LED_PER_STRAND);
+	//FastLED.addLeds<NEOPIXEL, LED_PIN_2>(leds_2, LED_PER_STRAND);
 
+  
 	//say hello
 	SetupFinished();
 
@@ -71,57 +75,82 @@ void setup() {
 
 
 
+void EthernetReady(){
+  
+  /*use mdns for host name resolution*/
+  if (!MDNS.begin(host)) { //http://esp32.local
+    Serial.println("Error setting up MDNS responder!");
+    ESP.restart();
+  }
+  
+  SetupE131();
+  ArduinoOTA.begin();
+  eth_connected = true;
+}
+
+
+void BeginEthernet()
+{
+ //disable sleep
+  esp_wifi_set_ps(WIFI_PS_NONE);
+  
+  // To be called before ETH.begin()
+  WT32_ETH01_onEvent();
+  
+  WiFi.onEvent(WiFiEvent);
+  ETH.begin(ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_TYPE, ETH_CLK_MODE);
+  SetupUpdateServer();
+}
+
+
 // the loop function runs over and over again until power down or reset
 void loop() {
+  delay(1);
+  if(!eth_connected)
+    return;
+    
   ArduinoOTA.handle();
-	HandleE131();
-
-
+  HandleE131();
 	FastLED.show();
-
-	delay(1);
 }
 
-void SetupWifi() {
-
-	// Make sure you're in station mode    
-	WiFi.mode(WIFI_STA);
-
-	//disable sleep
-	esp_wifi_set_ps(WIFI_PS_NONE);
-
-	WiFi.begin(ssid, password);
-	Serial.println("");
-	// Wait for connection
-  size_t endOfWait = 20;
-	while (WiFi.status() != WL_CONNECTED) {
-		delay(500);
-		Serial.print(".");
-    endOfWait--;
-    if(endOfWait <= 0){      
-      ESP.restart();
-    }
-	}
-	Serial.println("");
-	Serial.print("Connected to ");
-	Serial.println(ssid);
-	Serial.print("IP address: ");
-	Serial.println(WiFi.localIP());
-
-	/*use mdns for host name resolution*/
-	if (!MDNS.begin(host)) { //http://esp32.local
-		Serial.println("Error setting up MDNS responder!");
-		while (1) {
-			delay(1000);
-		}
-	}
-	Serial.println("mDNS responder started");
-
-	Serial.println("WiFi Ready");
-	Serial.print("IP address: ");
-	Serial.println(WiFi.localIP());
-
+void WiFiEvent(WiFiEvent_t event)
+{
+  switch (event) {
+    case SYSTEM_EVENT_ETH_START:
+      Serial.println("ETH Started");
+      //set eth hostname here
+      ETH.setHostname(host);
+      break;
+    case SYSTEM_EVENT_ETH_CONNECTED:
+      Serial.println("ETH Connected");
+      break;
+    case SYSTEM_EVENT_ETH_GOT_IP:
+      Serial.print("ETH MAC: ");
+      Serial.print(ETH.macAddress());
+      Serial.print(", IPv4: ");
+      Serial.print(ETH.localIP());
+      if (ETH.fullDuplex()) {
+        Serial.print(", FULL_DUPLEX");
+      }
+      Serial.print(", ");
+      Serial.print(ETH.linkSpeed());
+      Serial.println("Mbps");
+      EthernetReady();
+      break;
+    case SYSTEM_EVENT_ETH_DISCONNECTED:
+      Serial.println("ETH Disconnected");
+      eth_connected = false;
+      break;
+    case SYSTEM_EVENT_ETH_STOP:
+      Serial.println("ETH Stopped");
+      eth_connected = false;
+      break;
+    default:
+      break;
+  }
 }
+
 
 void SetupE131() {
 	Serial.println(F("starting sACN..."));
@@ -140,7 +169,6 @@ void SetupE131() {
 
 
 void SetupUpdateServer() {
-
   // Port defaults to 3232
   // ArduinoOTA.setPort(3232);
 
@@ -180,7 +208,6 @@ void SetupUpdateServer() {
       else if (error == OTA_END_ERROR) Serial.println("End Failed");
     });
 
-  ArduinoOTA.begin();
 
 }
 
@@ -244,11 +271,18 @@ void HandleE131() {
 		uint16_t dmxDataLen = htons(packet.property_value_count) - 1;
 
 
+    
+    Serial.print("recieved E131 Universe");
+    Serial.println(universe);
+    
+  
 		if (universe != UNIVERSE)
 			return;
 
 		if (dmxDataLen < MIN_DATA_LEN +1)
 			return;
+
+     
 
 		size_t currentPixel = 0;
 
