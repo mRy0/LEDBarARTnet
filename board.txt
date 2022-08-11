@@ -1,3 +1,0 @@
-  network.password=revoltec
-  network.auth_upload=yes
-  network.port=3232
